@@ -1,0 +1,31 @@
+# Node.js dependencies (to avoid copying them to the container)
+node_modules/
+
+# Environment variables (don't include sensitive files in the image)
+.env
+
+# Logs (no need for logs in the Docker image)
+*.log
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# IDE and editor settings (don't need them inside the container)
+.vscode/
+.idea/
+
+# Test coverage reports (don't need them inside the container)
+coverage/
+
+# Build artifacts (you usually build these files before pushing to Docker)
+dist/
+build/
+out/
+
+# Git-related files (no need to include version control data inside the image)
+.git/
+
+# Docker-related files (no need to include the Dockerfile or docker-compose.yml in the image)
+Dockerfile
+docker-compose.yml

@@ -1,0 +1,36 @@
+# Node.js dependencies
+node_modules/
+
+# Environment variables (sensitive data)
+.env
+
+# Logs
+*.log
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# IDE configuration files (e.g., for Visual Studio Code, WebStorm, etc.)
+.vscode/
+.idea/
+
+# npm cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage reports
+coverage/
+
+# Build artifacts
+dist/
+build/
+out/
+
+# Git-related files (optional, but useful if you want to ignore the Git folder)
+.git/
+
+# Docker-related files (if not needed for tracking)
+Dockerfile
+docker-compose.yml
