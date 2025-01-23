@@ -1,5 +1,4 @@
-import User from "../models/Users.js";
-import Project from "../models/Projects.js";
+import { User, Project } from "../models/index.js";
 
 export const isProjectHead = async (req, res, next) => {
   const { userId } = req;
@@ -11,7 +10,7 @@ export const isProjectHead = async (req, res, next) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    if (project.head === userId) {
+    if (project.project_head === userId) {
       return next();
     }
 
@@ -20,5 +19,4 @@ export const isProjectHead = async (req, res, next) => {
     console.error(error);
     return res.status(500).json({ message: 'An error occurred while verifying project head' });
   }
-    
 };

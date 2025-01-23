@@ -1,5 +1,5 @@
 import { DataTypes } from "sequelize";
-import { sequelize } from "../config/database";
+import { sequelize } from "../config/database.js";
 
 const Task = sequelize.define('Task', {
   id: {
@@ -30,8 +30,5 @@ const Task = sequelize.define('Task', {
 }, {
   timestamps: true,
 });
-
-Task.belongsTo(User, { foreignKey: 'assigned_to', as: 'assignee' });
-Task.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
 
 export default Task;

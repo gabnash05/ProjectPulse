@@ -1,4 +1,4 @@
-import User from '../models/Users.js';
+import { User } from '../models/index.js';
 import { generateToken, hashPassword, comparePasswords } from '../utils/authUtils.js';
 
 export const registerUser = async (req, res) => {

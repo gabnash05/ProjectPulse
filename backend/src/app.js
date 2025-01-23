@@ -1,4 +1,4 @@
-// Dependecies
+// Imports
 import express from 'express';
 import dotenv from 'dotenv';
 
@@ -8,6 +8,7 @@ import projectsRoutes from './routes/projectsRoutes.js';
 import tasksRoutes from './routes/tasksRoutes.js';
 
 import { connectDB, sequelize } from './config/database.js';
+import './models/index.js';
 
 const app = express();
 dotenv.config();
