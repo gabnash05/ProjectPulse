@@ -1,5 +1,5 @@
 import { DataTypes } from "sequelize";
-import { sequelize } from "../config/database";
+import { sequelize } from "../config/database.js";
 
 const Project = sequelize.define('Project', {
   id: {
@@ -18,9 +18,5 @@ const Project = sequelize.define('Project', {
 }, {
   timestamps: true,
 });
-
-// Associations
-Project.belongsTo(User, { foreignKey: 'project_head_id', as: 'project_head' });
-Project.belongsToMany(User, { through: 'project_members', as: 'members'});
 
 export default Project;

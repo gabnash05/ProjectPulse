@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import { sequelize } from "../config/database";
+import { sequelize } from "../config/database.js";
 
 const User = sequelize.define('User', {
   id: {
@@ -27,8 +27,5 @@ const User = sequelize.define('User', {
 },  {
   timestamps: true,
 })
-
-// Associations
-User.belongsToMany(Project, { through: 'ProjectMembers', as: 'projects' });
 
 export default User;
