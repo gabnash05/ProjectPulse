@@ -14,10 +14,10 @@ export const registerUser = async (req, res) => {
     const user = await User.create({ username, email, password: hashedPassword });
 
     const token = generateToken(user.id);
-    res.status(201).json({ token }); 
+    return res.status(201).json({ token }); 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Error in Registering User' });
+    return res.status(500).json({ message: 'Error in Registering User' });
   }
 }
 
@@ -40,12 +40,12 @@ export const loginUser = async (req, res) => {
     }
 
     const token = generateToken(user.id);
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Login successful',
       user: { id: user.id, email: user.email, username: user.username, token },
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Error in Logging In User' });
+    return res.status(500).json({ message: 'Error in Logging In User' });
   }
 }

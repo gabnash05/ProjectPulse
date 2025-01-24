@@ -35,7 +35,7 @@ export const getAllProjectTasks = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    const isAuthorized = project.project_head_id === userId || await project.hasMember(userId);
+    const isAuthorized = project.project_head_id === userId || await project.hasProject_member(userId);
     if (!isAuthorized) {
       return res.status(403).json({ message: 'You are not authorized to access tasks for this project' });
     }
@@ -57,7 +57,7 @@ export const getAllProjectTasks = async (req, res) => {
 
 export const getAllProjectMembers = async (req, res) => {
   const userId = req.userId;
-  const projectId = req.params.projectId;
+  const { projectId } = req.params;
 
   try {
     const project = await Project.findByPk(projectId);
@@ -66,13 +66,14 @@ export const getAllProjectMembers = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    const isAuthorized = project.project_head_id === userId || await project.hasMember(userId);
+    const isAuthorized = project.project_head_id === userId || await project.hasProject_member(userId);
     if (!isAuthorized) {
       return res.status(403).json({ message: 'You are not authorized to access members for this project' });
     }
 
-    const members = await project.getMembers({
+    const members = await project.getProject_members({
       attributes: ['id', 'username', 'email'],
+      joinTableAttributes: [],
     });
 
     return res.status(200).json(members);
@@ -97,7 +98,7 @@ export const createProject = async (req, res) => {
         { transaction: t }
       );
 
-      await newProject.addMember(userId, { transaction: t }); 
+      await newProject.addProject_member(userId, { transaction: t }); 
 
       return newProject;
     });
@@ -130,14 +131,13 @@ export const addProjectMember = async (req, res) => {
       return res.status(404).json({ message: 'User not Found'});
     }
 
-    const isMember = await project.hasMember(member);
+    const isMember = await project.hasProject_member(member);
     if (isMember) {
       return res.status(400).json({ message: 'User is already a member of the project' });
     }
 
-    await project.addMember(member);
+    await project.addProject_member(member);
     return res.status(200).json({
-      message: 'Project member added successfully',
       projectId,
       member,
     });
@@ -148,12 +148,8 @@ export const addProjectMember = async (req, res) => {
 }
 
 export const updateProject = async (req, res) => { 
-  const projectId = req.params.projectId;
+  const { projectId } = req.params;
   const { name, description } = req.body;
-
-  if (!name || !description) {
-    return res.status(400).json({ message: 'Project name and description are required' });
-  }
 
   try {
     const project = await Project.findByPk(projectId);
@@ -162,7 +158,15 @@ export const updateProject = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    const updatedProject = await project.update({ name, description });
+    if (name) {
+      project.name = name;
+    }
+
+    if (description) { 
+      project.description = description;
+    }
+
+    const updatedProject = await project.save();
 
     return res.status(200).json(updatedProject);
   } catch (error) {
@@ -211,12 +215,12 @@ export const removeProjectMember = async (req, res) => {
       return res.status(403).json({ message: 'Project head cannot be removed from project members' });
     }
 
-    const isMember = await project.hasMember(member);
+    const isMember = await project.hasProject_member(member);
     if (!isMember) {
       return res.status(400).json({ message: 'User is not a member of the project' });
     }
 
-    await project.removeMember(member);
+    await project.removeProject_member(member);
 
     return res.status(200).json({ message: 'Project member removed successfully' });
   } catch (error) {

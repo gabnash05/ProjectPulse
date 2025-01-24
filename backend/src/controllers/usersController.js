@@ -22,14 +22,27 @@ export const getUserProjects = async (req, res) => {
 
   try {
     const userWithProjects = await User.findByPk(userId, {
-      include: {
-        model: Project,
-        as: 'projects',
-        through: {
-          attributes: ['createdAt', 'updatedAt']
+      include: [
+        {
+          model: Project,
+          as: 'projects',
+          include: [
+            {
+              model: User, 
+              as: 'project_members', 
+              attributes: ['id', 'username', 'email'], 
+              through: {
+                attributes: []
+              }
+            }
+          ],
+          through: {
+            attributes: []
+          },
+          attributes: ['id', 'name', 'description', 'project_head_id']
         }
-      },
-      attributes: [],
+      ],
+      attributes: [] 
     });
 
     if (!userWithProjects) {
