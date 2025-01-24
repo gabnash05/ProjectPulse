@@ -10,11 +10,11 @@ export const isProjectHead = async (req, res, next) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    if (project.project_head === userId) {
-      return next();
+    if (project.project_head_id !== userId) {
+      return res.status(403).json({ message: 'You are not authorized to perform this action' });
     }
-
-    return res.status(403).json({ message: 'You are not authorized to perform this action' });
+    
+    return next();
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'An error occurred while verifying project head' });
