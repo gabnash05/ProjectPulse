@@ -1,21 +1,40 @@
 import { User, Project, Task } from '../models/index.js';
 import { sequelize } from '../config/database.js';
+import { setCache, getCache, deleteCache, deleteCacheByPattern } from '../utils/redisUtils.js';
+import { isColString } from 'sequelize/lib/utils';
 
 export const getProject = async (req, res) => {
-  const projectId = req.params.projectId;
+  const { userId } = req;
+  const { projectId } = req.params;
 
+  const cacheKey = `projects:${projectId}:user:${userId}`;
   try {
+    // Check cache
+    const cachedProject = await getCache(cacheKey);
+    if (cachedProject) {
+      return res.status(200).json(cachedProject);
+    }
+
+    // Fetch from DB
     const project = await Project.findByPk(projectId, {
       include: [{ 
         model: User,
-        as: 'members', 
+        as: 'project_members', 
         attributes: ['id', 'username', 'email'] 
       }]
     });
-    
+
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
+
+    const isAuthorized = project.project_head_id === userId || project.project_members.some(member => member.id === userId);
+    if (!isAuthorized) {
+      return res.status(403).json({ message: 'You are not authorized to access tasks for this project' });
+    }
+
+    // Set cache
+    await setCache(cacheKey, project);
 
     return res.status(200).json(project);
   } catch (error) {
@@ -25,17 +44,32 @@ export const getProject = async (req, res) => {
 }
 
 export const getAllProjectTasks = async (req, res) => {
-  const userId = req.userId;
-  const projectId = req.params.projectId;
+  const { userId } = req;
+  const { projectId } = req.params;
 
+  const cacheKey = `projects:${projectId}:user:${userId}:tasks`;
   try {
-    const project = await Project.findByPk(projectId);
+    // Check cache
+    const cachedProjectTasks = await getCache(cacheKey);
+    if (cachedProjectTasks) {
+      console.log("cache hit");
+      return res.status(200).json(cachedProjectTasks);
+    }
 
+    // Fetch from DB
+    const project = await Project.findByPk(projectId, {
+      include: [{ 
+        model: User,
+        as: 'project_members', 
+        attributes: ['id', 'username', 'email'] 
+      }]
+    });
+    
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    const isAuthorized = project.project_head_id === userId || await project.hasProject_member(userId);
+    const isAuthorized = project.project_head_id === userId || project.project_members.some(member => member.id === userId);
     if (!isAuthorized) {
       return res.status(403).json({ message: 'You are not authorized to access tasks for this project' });
     }
@@ -48,6 +82,10 @@ export const getAllProjectTasks = async (req, res) => {
       }]
     });
 
+    // Set cache
+    await setCache(cacheKey, tasks);
+    console.log("cache miss");
+
     return res.status(200).json(tasks);
   } catch (error) {
     console.error(error);
@@ -56,27 +94,40 @@ export const getAllProjectTasks = async (req, res) => {
 }
 
 export const getAllProjectMembers = async (req, res) => {
-  const userId = req.userId;
+  const { userId } = req;
   const { projectId } = req.params;
-
+  
+  const cacheKey = `projects:${projectId}:user:${userId}:members`;
   try {
-    const project = await Project.findByPk(projectId);
+    // Get cache
+    const cachedProjectMembers = await getCache(cacheKey);
+    if (cachedProjectMembers) {
+      return res.status(200).json(cachedProjectMembers);
+    }
+
+    // Fetch from DB
+    const project = await Project.findByPk(projectId, {
+      include: [{
+        model: User,
+        as: 'project_members',
+        attributes: ['id', 'username', 'email'],
+        through: { attributes: [] },
+      }],
+    });
 
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    const isAuthorized = project.project_head_id === userId || await project.hasProject_member(userId);
+    const isAuthorized = project.project_head_id === userId || project.project_members.some(member => member.id === userId);
     if (!isAuthorized) {
       return res.status(403).json({ message: 'You are not authorized to access members for this project' });
     }
 
-    const members = await project.getProject_members({
-      attributes: ['id', 'username', 'email'],
-      joinTableAttributes: [],
-    });
+    // Set cache
+    await setCache(cacheKey, project.project_members);
 
-    return res.status(200).json(members);
+    return res.status(200).json(project.project_members);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Error fetching tasks' });
@@ -85,20 +136,23 @@ export const getAllProjectMembers = async (req, res) => {
 
 export const createProject = async (req, res) => {
   const { name, description } = req.body;
-  const userId = req.userId;
+  const { userId } = req;
 
   if (!name) {
     return res.status(400).json({ message: 'Project name is required' });
   }
 
-  try { 
+  try {
     const project = await sequelize.transaction(async (t) => {
       const newProject = await Project.create(
         { name, description, project_head_id: userId },
         { transaction: t }
       );
 
-      await newProject.addProject_member(userId, { transaction: t }); 
+      await newProject.addProject_member(userId, { transaction: t });
+
+      // Invalidate cache
+      await deleteCache(`users:${userId}:projects`);
 
       return newProject;
     });
@@ -119,6 +173,7 @@ export const addProjectMember = async (req, res) => {
   }
 
   try {
+    // Fetch from DB
     const project = await Project.findByPk(projectId);
 
     if (!project) {
@@ -137,7 +192,17 @@ export const addProjectMember = async (req, res) => {
     }
 
     await project.addProject_member(member);
+
+    // Invalidate cache
+    await deleteCacheByPattern(`projects:${projectId}:user:*`);
+
+    const members = await project.getProject_members();
+    for (const member of members) {
+      await deleteCache(`users:${member.id}:projects`);
+    }
+
     return res.status(200).json({
+      message: "Project member added successfully",
       projectId,
       member,
     });
@@ -152,6 +217,7 @@ export const updateProject = async (req, res) => {
   const { name, description } = req.body;
 
   try {
+    // Fetch from DB
     const project = await Project.findByPk(projectId);
 
     if (!project) {
@@ -168,7 +234,15 @@ export const updateProject = async (req, res) => {
 
     const updatedProject = await project.save();
 
-    return res.status(200).json(updatedProject);
+    // Invalidate cache
+    await deleteCacheByPattern(`projects:${projectId}:user:*`);
+
+    const members = await project.getProject_members();
+    for (const member of members) {
+      await deleteCache(`users:${member.id}:projects`);
+    }
+
+    return res.status(200).json({ message: 'Project updated successfully', updatedProject });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Error updating project' });
@@ -176,29 +250,52 @@ export const updateProject = async (req, res) => {
 }
 
 export const deleteProject = async (req, res) => {
-  const projectId = req.params.projectId;
+  const { projectId } = req.params;
 
   try {
-    const project = await Project.findByPk(projectId);
+    // Fetch the project
+    const project = await Project.findByPk(projectId, {
+      include: [
+        {
+          model: User,
+          as: 'project_members',
+          attributes: ['id'],
+          through: {
+            attributes: []
+          }
+        }
+      ]
+    });
 
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
 
+    const members = project.project_members || [];
+
     await project.destroy();
+
+    // Invalidate cache
+    await deleteCacheByPattern(`projects:${projectId}:user:*`);
+
+    for (const member of members) {
+      await deleteCache(`users:${member.id}:projects`);
+    }
 
     return res.status(200).json({ message: 'Project deleted successfully' });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Error deleting project' });
   }
-}
+};
+
 
 export const removeProjectMember = async (req, res) => {
-  const projectId = req.params.projectId;
+  const { projectId } = req.params;
   const { memberId } = req.params;
 
   try {
+    // Fetch from DB
     const project = await Project.findByPk(projectId);
 
     if (!project) {
@@ -221,6 +318,14 @@ export const removeProjectMember = async (req, res) => {
     }
 
     await project.removeProject_member(member);
+
+    // Invalidate cache
+    await deleteCacheByPattern(`projects:${projectId}:user:*`);
+
+    const members = await project.getProject_members();
+    for (const member of members) {
+      await deleteCache(`users:${member.id}:projects`);
+    }
 
     return res.status(200).json({ message: 'Project member removed successfully' });
   } catch (error) {

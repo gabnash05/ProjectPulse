@@ -1,10 +1,19 @@
 import { User, Project, Task } from '../models/index.js';
+import { getCache, setCache, deleteCache, deleteCacheByPattern } from '../utils/redisUtils.js';
 
 export const getTask = async (req, res) =>{
   const { taskId } = req.params;
   const { userId } = req;
 
+  const cacheKey = `tasks:${taskId}:user:${userId}`;
   try {
+    // Check cache
+    const cachedTask = await getCache(cacheKey);
+    if (cachedTask) {
+      return res.status(200).json(cachedTask);
+    }
+
+    // Fetch from DB
     const task = await Task.findByPk(taskId, {
       include: [
         {
@@ -28,6 +37,9 @@ export const getTask = async (req, res) =>{
     if (!isMember) {
       return res.status(403).json({ message: "You are not a member of the project this task belongs to" });
     }
+
+    // Set cache
+    await setCache(cacheKey, task);
 
     return res.status(200).json(task);
   } catch (error) {
@@ -77,6 +89,14 @@ export const createTask = async (req, res) => {
       deadline: isProjectHead ? deadline : null,
     });
 
+    // Invalidate cache
+    await deleteCache(`users:${assigneeId}:tasks`);
+
+    const members = await project.getProject_members();
+    for (const member of members) {
+      await deleteCache(`projects:${projectId}:user:${member.id}:tasks`);
+    }
+
     return res.status(201).json(task);
   } catch (error) {
     console.log(error);
@@ -90,6 +110,7 @@ export const updateTask = async (req, res) => {
   const { userId } = req;
 
   try {
+    // Fetch from DB
     const task = await Task.findByPk(taskId, {
       include: [
         {
@@ -102,7 +123,8 @@ export const updateTask = async (req, res) => {
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
-
+    
+    // Updating fields
     const updatedFields = {};
 
     if (title) updatedFields.title = title;
@@ -130,7 +152,16 @@ export const updateTask = async (req, res) => {
 
     await task.update(updatedFields);
 
-    return res.status(200).json(task);
+    // Invalidate cache
+    await deleteCacheByPattern(`tasks:${taskId}:user:*`);
+
+    const members = await task.project.getProject_members();
+    for (const member of members) {
+      await deleteCacheByPattern(`users:${member.id}:*`);
+      await deleteCache(`projects:${task.project.id}:user:${member.id}:tasks`);
+    }
+
+    return res.status(200).json({message: "Task updated", task});
   } catch (error) {
     console.log(error);
     return res.status(500).json({ message: "Error updating task" });
@@ -146,6 +177,7 @@ export const updateTaskStatus = async (req, res) => {
   }
 
   try {
+    // Fetch from DB
     const task = await Task.findByPk(taskId);
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
@@ -153,6 +185,15 @@ export const updateTaskStatus = async (req, res) => {
 
     task.status = status;
     await task.save();
+
+    // Invalidate cache
+    await deleteCacheByPattern(`tasks:${taskId}:user:*`);
+
+    const members = await task.project.getProject_members();
+    for (const member of members) {
+      await deleteCacheByPattern(`users:${member.id}:*`);
+      await deleteCache(`projects:${task.project.id}:user:${member.id}:tasks`);
+    }
 
     return res.status(200).json(task);
   } catch (error) {
@@ -164,14 +205,33 @@ export const deleteTask = async (req, res) => {
   const { projectId, taskId } = req.params;
 
   try {
-    const project = await Project.findByPk(projectId);
+    const project = await Project.findByPk(projectId, {
+      include: [{ 
+        model: User, 
+        as: 'project_members', 
+        attributes: ['id'] }]
+    });
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
     }
 
     const task = await Task.findOne({ where: { id: taskId, project_id: projectId } });
 
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
     await task.destroy();
+
+    // Invalidate cache
+    const members = project.project_members;
+
+    await deleteCacheByPattern(`tasks:${taskId}:user:*`);
+
+    for (const member of members) {
+      await deleteCacheByPattern(`users:${member.id}:tasks`);
+      await deleteCache(`projects:${projectId}:user:${member.id}:tasks`);
+    }
 
     return res.status(200).json({ message: "Task deleted" });
   } catch (error) {
