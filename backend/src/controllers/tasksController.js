@@ -10,6 +10,7 @@ export const getTask = async (req, res) =>{
     // Check cache
     const cachedTask = await getCache(cacheKey);
     if (cachedTask) {
+      console.log("cache hit");
       return res.status(200).json(cachedTask);
     }
 
@@ -40,6 +41,7 @@ export const getTask = async (req, res) =>{
 
     // Set cache
     await setCache(cacheKey, task);
+    console.log("cache miss");
 
     return res.status(200).json(task);
   } catch (error) {
@@ -106,7 +108,7 @@ export const createTask = async (req, res) => {
 // ADD CHECK DEADLINE FORMAT AND PRIORITY FORMAT
 export const updateTask = async (req, res) => {
   const { taskId } = req.params;
-  const { title, description, assignee, priority, deadline } = req.body;
+  const { title, description, assigned_to, priority, deadline } = req.body;
   const { userId } = req;
 
   try {
@@ -133,12 +135,12 @@ export const updateTask = async (req, res) => {
     if (deadline) updatedFields.deadline = deadline;
 
     const isProjectHead = task.project.project_head_id === userId;
-    if (!isProjectHead && (assignee || deadline)) {
+    if (!isProjectHead && (assigned_to || deadline)) {
       return res.status(403).json({ message: "Only the project head can update task assignment and deadlines" });
     }
 
-    if (assignee) {
-      const assignee = await User.findByPk(assignee);
+    if (assigned_to) {
+      const assignee = await User.findByPk(assigned_to);
       if (!assignee) {
         return res.status(404).json({ message: "Assignee not found" });
       }
@@ -147,7 +149,7 @@ export const updateTask = async (req, res) => {
       if (!isMember) {
         return res.status(403).json({ message: "Assignee is not a member of the project" });
       }
-      updatedFields.assignee = assignee;
+      updatedFields.assigned_to = assignee.id;
     }
 
     await task.update(updatedFields);
@@ -238,3 +240,4 @@ export const deleteTask = async (req, res) => {
     return res.status(500).json({ message: "Error deleting task" });
   }
 }
+

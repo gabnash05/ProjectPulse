@@ -1,7 +1,6 @@
 import { User, Project, Task } from '../models/index.js';
 import { sequelize } from '../config/database.js';
 import { setCache, getCache, deleteCache, deleteCacheByPattern } from '../utils/redisUtils.js';
-import { isColString } from 'sequelize/lib/utils';
 
 export const getProject = async (req, res) => {
   const { userId } = req;
@@ -12,6 +11,7 @@ export const getProject = async (req, res) => {
     // Check cache
     const cachedProject = await getCache(cacheKey);
     if (cachedProject) {
+      console.log("cache hit");
       return res.status(200).json(cachedProject);
     }
 
@@ -35,6 +35,7 @@ export const getProject = async (req, res) => {
 
     // Set cache
     await setCache(cacheKey, project);
+    console.log("cache miss");
 
     return res.status(200).json(project);
   } catch (error) {
@@ -102,6 +103,7 @@ export const getAllProjectMembers = async (req, res) => {
     // Get cache
     const cachedProjectMembers = await getCache(cacheKey);
     if (cachedProjectMembers) {
+      console.log("cache hit");
       return res.status(200).json(cachedProjectMembers);
     }
 
@@ -126,6 +128,7 @@ export const getAllProjectMembers = async (req, res) => {
 
     // Set cache
     await setCache(cacheKey, project.project_members);
+    console.log("cache miss");
 
     return res.status(200).json(project.project_members);
   } catch (error) {
@@ -289,7 +292,6 @@ export const deleteProject = async (req, res) => {
   }
 };
 
-
 export const removeProjectMember = async (req, res) => {
   const { projectId } = req.params;
   const { memberId } = req.params;
@@ -332,4 +334,4 @@ export const removeProjectMember = async (req, res) => {
     console.error(error);
     return res.status(500).json({ message: 'Error removing project member' });
   }
-} 
+}

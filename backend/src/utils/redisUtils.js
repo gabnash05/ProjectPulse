@@ -30,7 +30,6 @@ export const deleteCacheByPattern = async (pattern) => {
   try {
     do {
       const [newCursor, keys] = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-      console.log(keys);
       if (keys.length > 0) {
         await redisClient.unlink(...keys);
       }
