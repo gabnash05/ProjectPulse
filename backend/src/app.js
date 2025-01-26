@@ -1,6 +1,7 @@
 // Imports
 import express from 'express';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
 
 import authRoutes from './routes/authRoutes.js';
 import usersRoutes from './routes/usersRoutes.js';
@@ -29,6 +30,7 @@ initializeDatabase();
 
 // Middleware
 app.use(express.json());
+app.use(helmet());
 
 // Routes
 app.use('/auth', authRoutes);
