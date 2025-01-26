@@ -1,5 +1,6 @@
 import { User } from '../models/index.js';
 import { generateToken, hashPassword, comparePasswords } from '../utils/authUtils.js';
+import { resetLoginCounter } from '../middleware/rateLimiter.js';
 
 export const registerUser = async (req, res) => {
   const { username, email, password } = req.body;
@@ -39,7 +40,12 @@ export const loginUser = async (req, res) => {
       return res.status(401).json({ message: 'Invalid Password' });
     }
 
+    // Reset login counter
+    resetLoginCounter(user.username);
+
+    // Log in user
     const token = generateToken(user.id);
+
     return res.status(200).json({
       message: 'Login successful',
       user: { id: user.id, email: user.email, username: user.username, token },
