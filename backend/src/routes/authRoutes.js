@@ -7,5 +7,6 @@ const router = express.Router();
 
 router.post('/register', registrationRateLimiter(5, 600), registerUser);
 router.post('/login', loginRateLimiter(5, 300), loginUser);
+router.post('/google/callback');
 
 export default router;
