@@ -1,4 +1,4 @@
-import { User, Project, Task } from '../models/index.js';
+import { User, Project } from '../models/index.js';
 import { sequelize } from '../config/database.js';
 import { setCache, getCache, deleteCache, deleteCacheByPattern } from '../utils/redisUtils.js';
 
